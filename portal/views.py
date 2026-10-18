@@ -99,6 +99,10 @@ def signup(request):
 
 @login_required
 def dashboard(request):
+    if request.user.groups.filter(name__in=('support_user', 'support_admin')).exists():
+        return redirect('support_tickets')
+    if not request.user.is_superuser and not request.user.groups.filter(name__in=('candidate', 'client', 'recruiter', 'manager', 'admin')).exists() and request.user.company_memberships.filter(is_active=True).exists():
+        return redirect('management_home')
     role = user_role(request.user)
     if role == 'client' and not request.user.is_active:
         return render(request, 'portal/dashboard.html', {'role_label':'Client', 'dashboard_message':'Your account is awaiting review.', 'pending':True, 'cards':[], 'actions':[]})
