@@ -91,7 +91,6 @@ def dashboard(request):
         ]),
         'admin': ('Platform administration', [{'value':jobs_count,'label':'Published jobs'},{'value':app_count,'label':'Applications'},{'value':User.objects.count(),'label':'User accounts'}], [
             {'kicker':'Administration','title':'User and role management','description':'Manage user permissions through Django Admin. Assign roles only after verifying the person’s authorization.','url':'/admin/','link_label':'Open Django Admin'},
-            {'kicker':'Integrations','title':'Service account registry','description':'View local service identities and setup guidance for external providers. WordPress is excluded.','url':'/service-accounts/','link_label':'View service accounts'}
         ])
     }
     message, cards, actions = role_content[role]
@@ -103,13 +102,6 @@ def staff_dashboard(request):
     if role not in ('recruiter', 'manager', 'admin'):
         raise PermissionDenied('This workspace is restricted to Cretan Staffing staff.')
     return render(request, 'portal/staff.html', {'jobs': Job.objects.all().order_by('-created_at'), 'applications': Application.objects.select_related('job').order_by('-created_at')[:100]})
-
-@login_required
-def service_accounts(request):
-    if user_role(request.user) not in ('manager', 'admin'):
-        raise PermissionDenied('Service account administration is restricted.')
-    accounts = User.objects.filter(username__startswith='svc_').order_by('username')
-    return render(request, 'portal/integrations.html', {'service_accounts': [{'username':u.username, 'service':u.username[4:].replace('_',' ').title(), 'active':u.is_active} for u in accounts]})
 
 @require_http_methods(['GET', 'POST'])
 def apply(request, job_id):
