@@ -137,10 +137,12 @@ def join_company(request):
             error = 'That company PIN was not recognized.'
         else:
             company = matches[0]
-            membership, created = CompanyMembership.objects.update_or_create(
-                user=request.user, company=company,
-                defaults={'role': 'employee', 'is_active': True},
-            )
+            membership = CompanyMembership.objects.filter(user=request.user, company=company).first()
+            if membership is None:
+                membership = CompanyMembership.objects.create(user=request.user, company=company, role='employee', is_active=True)
+            elif not membership.is_active:
+                membership.is_active = True
+                membership.save(update_fields=['is_active', 'updated_at'])
             request.session['active_company_id'] = company.pk
             audit(request.user, 'company.joined_by_pin', company, 'Membership', membership.pk)
             messages.success(request, f'You joined {company.name}. A company administrator can update your role.')
@@ -238,6 +240,8 @@ def integration_management(request):
     if not company:
         return redirect('management_home')
     require_company_access(request.user, company)
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists():
+        raise PermissionDenied('Support accounts cannot manage integration credentials.')
     if not (can_manage_company(request.user, company) or is_master_admin(request.user)):
         raise PermissionDenied('Only company owners and administrators can manage integrations.')
     error = ''
@@ -273,6 +277,8 @@ def integration_management(request):
 @require_http_methods(['POST'])
 def toggle_integration(request, credential_id):
     credential = get_object_or_404(IntegrationCredential.objects.select_related('company'), pk=credential_id)
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists():
+        raise PermissionDenied('Support accounts cannot manage integration credentials.')
     if not (is_master_admin(request.user) or can_manage_company(request.user, credential.company)):
         raise PermissionDenied('Only company owners and administrators can manage integrations.')
     credential.is_active = not credential.is_active
