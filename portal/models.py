@@ -4,6 +4,7 @@ from pathlib import Path
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
+from .storage import EncryptedPrivateStorage
 
 
 def private_tax_upload_path(instance, filename):
@@ -110,7 +111,7 @@ class TaxDocument(models.Model):
     document_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     tax_year = models.PositiveSmallIntegerField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='uploaded')
-    file = models.FileField(upload_to=private_tax_upload_path)
+    file = models.FileField(upload_to=private_tax_upload_path, storage=EncryptedPrivateStorage())
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='tax_documents_uploaded')
     uploaded_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
