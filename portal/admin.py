@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Application, AuditEvent, Company, CompanyMembership, IntegrationCredential, Job, PlatformControl
+from .models import Application, AuditEvent, Company, CompanyMembership, IntegrationCredential, Job, PlatformControl, SupportTicket
 
 
 @admin.register(Job)
@@ -104,3 +104,11 @@ class AuditEventAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    list_display = ('id', 'subject', 'company', 'created_by', 'status', 'priority', 'updated_at')
+    list_filter = ('status', 'priority', 'company')
+    search_fields = ('subject', 'created_by__username', 'company__name')
+    readonly_fields = ('created_by', 'company', 'subject', 'description', 'created_at', 'updated_at')
