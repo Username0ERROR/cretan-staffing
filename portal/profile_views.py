@@ -34,3 +34,35 @@ def my_profile(request):
         'profile_user': user, 'memberships': memberships,
         'is_master_admin': is_master_admin(user), 'error': error,
     })
+
+
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.hashers import check_password
+from .models import AccountSecurity
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def change_password(request):
+    error = ''
+    if request.method == 'POST':
+        current = request.POST.get('current_password', '')
+        password1 = request.POST.get('password1', '')
+        password2 = request.POST.get('password2', '')
+        if not check_password(current, request.user.password):
+            error = 'Current password was not accepted.'
+        elif len(password1) < 12:
+            error = 'Choose a password with at least 12 characters.'
+        elif password1 != password2:
+            error = 'The new passwords do not match.'
+        elif password1 == current:
+            error = 'Choose a new password different from the temporary password.'
+        else:
+            request.user.set_password(password1)
+            request.user.save(update_fields=['password'])
+            AccountSecurity.objects.update_or_create(user=request.user, defaults={'force_password_change': False})
+            update_session_auth_hash(request, request.user)
+            audit(request.user, 'account.password_changed', None, 'User', request.user.pk, {})
+            messages.success(request, 'Password updated successfully.')
+            return redirect('support_tickets' if request.user.groups.filter(name__in=('support_user', 'support_admin')).exists() else 'management_home')
+    return render(request, 'portal/change_password.html', {'error': error})
