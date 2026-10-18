@@ -279,12 +279,15 @@ def integration_management(request):
     if request.method == 'POST':
         provider = request.POST.get('provider', '').strip()[:120]
         endpoint_url = request.POST.get('endpoint_url', '').strip()[:500]
+        auth_scheme = request.POST.get('auth_scheme', 'Bearer')
         label = request.POST.get('account_label', '').strip()[:160]
         external_username = request.POST.get('external_username', '').strip()[:254]
         secret = request.POST.get('secret', '')
         scopes = request.POST.get('scopes', '').strip()[:500]
         if not provider or not label or not secret:
             error = 'Provider, account label, and API token/secret are required.'
+        elif auth_scheme not in {'Bearer', 'Token'}:
+            error = 'Choose a supported authorization scheme.'
         elif endpoint_url and not endpoint_url.lower().startswith('https://'):
             error = 'Integration endpoints must use HTTPS.'
         else:
@@ -294,7 +297,7 @@ def integration_management(request):
                 error = str(exc)
             else:
                 credential = IntegrationCredential.objects.create(
-                    company=company, provider=provider, endpoint_url=endpoint_url, account_label=label,
+                    company=company, provider=provider, endpoint_url=endpoint_url, auth_scheme=auth_scheme, account_label=label,
                     external_username=external_username, encrypted_secret=encrypted,
                     scopes=scopes, created_by=request.user,
                 )
@@ -536,7 +539,7 @@ def test_integration(request, credential_id):
         _validate_public_https_endpoint(target)
         token = decrypt_secret(credential.encrypted_secret)
         request_obj = Request(target, headers={
-            'Authorization': f'Bearer {token}',
+            'Authorization': f'{credential.auth_scheme} {token}',
             'Accept': 'application/json',
             'User-Agent': 'CretanStaffing-IntegrationCheck/1.0',
         }, method='GET')
