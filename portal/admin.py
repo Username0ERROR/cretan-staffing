@@ -66,6 +66,9 @@ class ProtectedOwnerUserAdmin(DjangoUserAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
     list_display = ('name', 'slug', 'is_active', 'created_by', 'created_at')
     search_fields = ('name', 'legal_name', 'slug')
     list_filter = ('is_active',)
