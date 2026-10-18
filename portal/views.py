@@ -80,8 +80,8 @@ def dashboard(request):
             {'kicker':'Opportunities','title':'Explore open jobs','description':'Browse published roles and submit an application.','url':'/','link_label':'Browse jobs'},
             {'kicker':'Applications','title':'Your applications','description':'Application tracking is being connected to your candidate profile.'}
         ]),
-        'client': ('Your employer workspace', [{'value':'Pending','label':'Account status'},{'value':jobs_count,'label':'Sample public roles'}], [
-            {'kicker':'Employer tools','title':'Request a job posting','description':'After account approval, the client workspace can be used to coordinate job requests with Cretan Staffing.','url':'','link_label':''}
+        'client': ('Your employer workspace', [{'value':'Active','label':'Account status'},{'value':jobs_count,'label':'Sample public roles'}], [
+            {'kicker':'Employer tools','title':'Client workspace','description':'Coordinate job requests and hiring needs with Cretan Staffing. Job posting and applicant access controls are being developed.','url':'','link_label':''}
         ]),
         'recruiter': ('Recruiting operations', [{'value':jobs_count,'label':'Published jobs'},{'value':app_count,'label':'Applications'},{'value':User.objects.filter(is_active=True).count(),'label':'Active accounts'}], [
             {'kicker':'Recruiting','title':'Recruiter workspace','description':'Review incoming applications and manage recruiting activity.','url':'/staff/','link_label':'Open recruiter workspace'}
@@ -91,7 +91,7 @@ def dashboard(request):
         ]),
         'admin': ('Platform administration', [{'value':jobs_count,'label':'Published jobs'},{'value':app_count,'label':'Applications'},{'value':User.objects.count(),'label':'User accounts'}], [
             {'kicker':'Administration','title':'User and role management','description':'Manage user permissions through Django Admin. Assign roles only after verifying the person’s authorization.','url':'/admin/','link_label':'Open Django Admin'},
-            {'kicker':'Integrations','title':'Service account registry','description':'View local service identities and setup guidance for external providers. WordPress is excluded.','url':'/admin/service-accounts/','link_label':'View service accounts'}
+            {'kicker':'Integrations','title':'Service account registry','description':'View local service identities and setup guidance for external providers. WordPress is excluded.','url':'/service-accounts/','link_label':'View service accounts'}
         ])
     }
     message, cards, actions = role_content[role]
