@@ -38,3 +38,27 @@ class SignupTests(TestCase):
         self.assertFalse(account.has_usable_password())
         self.assertFalse(account.is_active)
         self.assertTrue(account.groups.filter(name='service_account').exists())
+
+
+class MaintenanceModeTests(TestCase):
+    def setUp(self):
+        from .models import PlatformControl
+        self.control = PlatformControl.get_solo()
+
+    def test_maintenance_mode_blocks_public_pages_with_503(self):
+        self.control.maintenance_mode = True
+        self.control.save()
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(response, 'We’ll be back soon.', status_code=503)
+
+    def test_admin_recovery_path_remains_available_during_maintenance(self):
+        self.control.maintenance_mode = True
+        self.control.save()
+        response = self.client.get('/admin/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/admin/login/', response.url)
+
+    def test_site_is_available_by_default(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
