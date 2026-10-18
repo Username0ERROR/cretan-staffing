@@ -1,5 +1,6 @@
 import django.db.models.deletion
 import portal.models
+import portal.storage
 from django.conf import settings
 from django.db import migrations, models
 
