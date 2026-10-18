@@ -1,11 +1,14 @@
+import os
+
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
-from .models import Application, Job
+from .models import Application, Job, PlatformControl
 
 DEMO_JOBS = [
  {'title':'Warehouse Associate','company':'Cretan Staffing Demo Client','location':'Greeneville, TN / On-site','employment_type':'Full-time','description':'Support receiving, inventory, picking, packing, and safe warehouse operations. Reliable attendance and attention to detail are important.'},
@@ -23,6 +26,32 @@ def user_role(user):
         if role in roles:
             return role
     return 'candidate'
+
+@require_http_methods(['GET', 'POST'])
+def owner_recovery(request):
+    """
+    Break-glass recovery for the one owner configured in Render.
+    Django's authenticate() rejects inactive users, so verify the password
+    hash directly, then reactivate only after a successful password check.
+    """
+    owner_username = os.environ.get('STAFF_LOGIN_USERNAME', '').strip()
+    error = ''
+    if not owner_username:
+        error = 'Owner recovery is not configured. Set STAFF_LOGIN_USERNAME in Render.'
+    elif request.method == 'POST':
+        password = request.POST.get('password', '')
+        owner = User.objects.filter(username=owner_username, is_superuser=True, is_staff=True).first()
+        if owner is not None and password and check_password(password, owner.password):
+            owner.is_active = True
+            owner.save(update_fields=['is_active'])
+            # Recovery also releases the optional manual maintenance switch.
+            PlatformControl.objects.filter(pk=1).update(maintenance_mode=False)
+            login(request, owner, backend='django.contrib.auth.backends.ModelBackend')
+            messages.success(request, 'Owner access restored. The platform lock has been released.')
+            return redirect('dashboard')
+        error = 'The recovery credential was not accepted.'
+
+    return render(request, 'portal/owner_recovery.html', {'error': error})
 
 def home(request):
     if not Job.objects.exists():
@@ -90,7 +119,7 @@ def dashboard(request):
             {'kicker':'Oversight','title':'Review queue','description':'Review account requests and supervise staffing workflows.','url':'/staff/','link_label':'Open operations'}
         ]),
         'admin': ('Platform administration', [{'value':jobs_count,'label':'Published jobs'},{'value':app_count,'label':'Applications'},{'value':User.objects.count(),'label':'User accounts'}], [
-            {'kicker':'Administration','title':'User and role management','description':'Manage user permissions through Django Admin. Assign roles only after verifying the person’s authorization.','url':'/admin/','link_label':'Open Django Admin'},
+            {'kicker':'Administration','title':'Platform owner and user management','description':'Manage user permissions through Django Admin. The owner account cannot be deleted. Pausing it activates the platform deadlock.','url':'/admin/','link_label':'Open Django Admin'},
         ])
     }
     message, cards, actions = role_content[role]
