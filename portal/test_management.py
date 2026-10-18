@@ -15,6 +15,9 @@ User = get_user_model()
 
 class MultiCompanyManagementTests(TestCase):
     def setUp(self):
+        self.owner_env = patch.dict(os.environ, {'STAFF_LOGIN_USERNAME': ''})
+        self.owner_env.start()
+        self.addCleanup(self.owner_env.stop)
         self.owner = User.objects.create_user('tenantowner', 'owner@example.com', 'strong-password-123')
         self.member = User.objects.create_user('tenantmember', 'member@example.com', 'strong-password-123')
         self.company_pin = 'CRETAN-TEST-8241'
