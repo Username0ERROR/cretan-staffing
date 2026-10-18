@@ -290,7 +290,7 @@ def tax_documents(request):
     require_company_access(request.user, company)
     membership = membership_for(request.user, company)
     # Support personnel are explicitly excluded from document access.
-    if membership and membership.role in SUPPORT_ROLES:
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists() or (membership and membership.role in SUPPORT_ROLES):
         raise PermissionDenied('Support roles cannot view or download tax documents.')
     can_review = is_master_admin(request.user) or (membership and membership.role in COMPANY_ADMIN_ROLES | {'manager'})
     error = ''
@@ -339,7 +339,7 @@ def download_tax_document(request, document_id):
     require_company_access(request.user, doc.company)
     membership = membership_for(request.user, doc.company)
     can_review = is_master_admin(request.user) or (membership and membership.role in COMPANY_ADMIN_ROLES | {'manager'})
-    if membership and membership.role in SUPPORT_ROLES:
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists() or (membership and membership.role in SUPPORT_ROLES):
         raise PermissionDenied('Support personnel cannot download tax documents.')
     if not can_review and doc.owner_id != request.user.pk:
         raise PermissionDenied('You can only download your own tax documents.')
