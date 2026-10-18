@@ -7,6 +7,11 @@ from django.urls import reverse
 
 
 class SignupTests(TestCase):
+    def setUp(self):
+        self.owner_env = patch.dict(os.environ, {'STAFF_LOGIN_USERNAME': ''})
+        self.owner_env.start()
+        self.addCleanup(self.owner_env.stop)
+
     def test_candidate_can_sign_up_and_reaches_dashboard(self):
         response = self.client.post(reverse('signup'), {
             'username': 'newcandidate', 'email': 'candidate@example.com',
@@ -47,6 +52,9 @@ class SignupTests(TestCase):
 
 class MaintenanceModeTests(TestCase):
     def setUp(self):
+        self.owner_env = patch.dict(os.environ, {'STAFF_LOGIN_USERNAME': ''})
+        self.owner_env.start()
+        self.addCleanup(self.owner_env.stop)
         from .models import PlatformControl
         self.control = PlatformControl.get_solo()
 
