@@ -1,6 +1,11 @@
+import ipaddress
 import os
 import secrets
+import socket
 from datetime import date
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -223,7 +228,7 @@ def support_management(request):
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
         role = request.POST.get('role', '')
-        target = User.objects.filter(username=username).first()
+        target = User.objects.filter(username__iexact=username).first()
         if role not in SUPPORT_ROLES:
             error = 'Choose support_user or support_admin.'
         elif target and target.username == request.user.username:
@@ -476,3 +481,75 @@ def update_support_ticket(request, ticket_id):
     audit(request.user, 'support_ticket.updated', ticket.company, 'SupportTicket', ticket.pk, {'status': status})
     messages.success(request, f'Support request #{ticket.pk} updated.')
     return redirect('support_tickets')
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _validate_public_https_endpoint(url):
+    parsed = urlsplit(url)
+    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError('Use a public HTTPS endpoint without embedded credentials.')
+    if parsed.port not in (None, 443):
+        raise ValueError('Only the standard HTTPS port is allowed.')
+    hostname = parsed.hostname.rstrip('.').lower()
+    if hostname == 'localhost' or hostname.endswith(('.local', '.internal', '.localhost')):
+        raise ValueError('Private and local network endpoints are not allowed.')
+    try:
+        literal = ipaddress.ip_address(hostname)
+        addresses = [literal]
+    except ValueError:
+        try:
+            addresses = [ipaddress.ip_address(item[4][0]) for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)]
+        except (OSError, ValueError) as exc:
+            raise ValueError('The endpoint hostname could not be resolved.') from exc
+    if not addresses or any(not addr.is_global for addr in addresses):
+        raise ValueError('The endpoint must resolve only to public IP addresses.')
+    return parsed
+
+
+@login_required
+@require_http_methods(['POST'])
+def test_integration(request, credential_id):
+    credential = get_object_or_404(IntegrationCredential.objects.select_related('company'), pk=credential_id)
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists():
+        raise PermissionDenied('Support accounts cannot test integration credentials.')
+    if not (is_master_admin(request.user) or can_manage_company(request.user, credential.company)):
+        raise PermissionDenied('Only company owners and administrators can test integrations.')
+    if not credential.endpoint_url:
+        messages.error(request, 'Add the system HTTPS base URL before testing this connection.')
+        return redirect('integration_management')
+    try:
+        _validate_public_https_endpoint(credential.endpoint_url)
+        base = credential.endpoint_url.rstrip('/')
+        target = base + '/api/v1/' if 'horilla' in credential.provider.lower() else base
+        _validate_public_https_endpoint(target)
+        token = decrypt_secret(credential.encrypted_secret)
+        request_obj = Request(target, headers={
+            'Authorization': f'Bearer {token}',
+            'Accept': 'application/json',
+            'User-Agent': 'CretanStaffing-IntegrationCheck/1.0',
+        }, method='GET')
+        opener = build_opener(_NoRedirect())
+        try:
+            response = opener.open(request_obj, timeout=8)
+            status_code = response.getcode()
+            response.close()
+        except HTTPError as exc:
+            status_code = exc.code
+        if 200 <= status_code < 300:
+            audit(request.user, 'integration.connection_test_succeeded', credential.company, 'IntegrationCredential', credential.pk, {'provider': credential.provider, 'status_code': status_code})
+            messages.success(request, f'{credential.provider} responded with HTTP {status_code}. This confirms reachability, not that every API scope or sync operation is configured.')
+        elif status_code in (401, 403):
+            audit(request.user, 'integration.connection_test_auth_failed', credential.company, 'IntegrationCredential', credential.pk, {'provider': credential.provider, 'status_code': status_code})
+            messages.error(request, f'The endpoint responded with HTTP {status_code}. Check the API token and required scopes.')
+        elif status_code in (301, 302, 303, 307, 308):
+            messages.error(request, 'The endpoint redirected. Enter the final HTTPS API URL directly; redirects are not followed for security.')
+        else:
+            audit(request.user, 'integration.connection_test_failed', credential.company, 'IntegrationCredential', credential.pk, {'provider': credential.provider, 'status_code': status_code})
+            messages.error(request, f'The endpoint responded with HTTP {status_code}. Check the base URL and API root path.')
+    except (ValueError, ImproperlyConfigured, URLError, TimeoutError, OSError) as exc:
+        messages.error(request, str(exc)[:220] or 'Connection test failed.')
+    return redirect('integration_management')
