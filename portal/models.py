@@ -17,3 +17,29 @@ class Application(models.Model):
     message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self): return f'{self.full_name} — {self.job.title}'
+
+
+class PlatformControl(models.Model):
+    """Singleton control for site availability, managed by the owner in Django Admin."""
+    maintenance_mode = models.BooleanField(default=False)
+    maintenance_message = models.CharField(
+        max_length=240,
+        default='Cretan Staffing is temporarily undergoing scheduled maintenance. Please check back soon.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Website availability'
+        verbose_name_plural = 'Website availability'
+
+    def __str__(self):
+        return 'Website maintenance controls'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
