@@ -1,0 +1,28 @@
+{% extends 'portal/base.html' %}
+{% block title %}Owner Recovery | Cretan Staffing{% endblock %}
+{% block content %}
+<section class="auth-layout">
+  <div class="panel auth-card">
+    <div class="login-mark" style="margin-top:12px">C</div>
+    <div class="eyebrow">Cretan Staffing · Emergency access</div>
+    <h1 class="page-title">Restore platform access.</h1>
+    <p class="muted" style="margin:0 0 24px">The platform is locked while the owner account is paused. Verify the configured owner password to reactivate the account and release the deadlock.</p>
+    {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="form">
+      {% csrf_token %}
+      <label for="id_password">Owner password
+        <input id="id_password" type="password" name="password" autocomplete="current-password" required autofocus>
+      </label>
+      <button class="btn" type="submit" style="width:100%;margin-top:5px">Verify and unlock platform <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="login-help">Only the configured platform owner can use this recovery route. Recovery attempts are not a replacement for securing the owner password and Render environment variables.</p>
+  </div>
+  <aside class="auth-side">
+    <div class="eyebrow">Deadlock protection</div>
+    <h2>Application traffic is paused.</h2>
+    <p>Regular pages and API endpoints return a maintenance response until the owner credential is verified.</p>
+    <ul><li>Owner account is reactivated only after password verification</li><li>Manual maintenance mode is cleared after successful recovery</li><li>Normal routes become available on the next request</li></ul>
+    <div class="side-rule"><strong>Keep recovery private</strong><p>Do not share the owner password or place it in source code.</p></div>
+  </aside>
+</section>
+{% endblock %}
