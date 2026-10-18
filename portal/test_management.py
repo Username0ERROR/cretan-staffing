@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Company, CompanyMembership, IntegrationCredential
+from .models import AccountSecurity, Company, CompanyMembership, IntegrationCredential
 from .tenancy import decrypt_secret, encrypt_secret, verify_company_pin
 
 User = get_user_model()
@@ -61,6 +61,31 @@ class MultiCompanyManagementTests(TestCase):
             self.assertNotEqual(ciphertext, token)
             self.assertNotIn(token, ciphertext)
             self.assertEqual(decrypt_secret(ciphertext), token)
+
+
+    def test_company_owner_can_create_user_with_forced_password_rotation(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('company_users'), {
+            'username': 'newemployee',
+            'email': 'newemployee@example.com',
+            'role': 'employee',
+        })
+        self.assertEqual(response.status_code, 200)
+        new_user = User.objects.get(username='newemployee')
+        self.assertTrue(new_user.company_memberships.filter(company=self.company, role='employee', is_active=True).exists())
+        self.assertTrue(AccountSecurity.objects.get(user=new_user).force_password_change)
+        self.assertContains(response, 'One-time temporary password')
+        self.assertEqual(response.headers.get('Cache-Control'), 'no-store')
+
+    def test_provisioned_user_must_change_temporary_password(self):
+        from django.test import Client
+        new_user = User.objects.create_user('forceduser', 'forced@example.com', 'temporary-password-123')
+        AccountSecurity.objects.create(user=new_user, force_password_change=True)
+        client = Client()
+        client.force_login(new_user)
+        response = client.get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('change_password'))
 
     def test_support_ticket_page_is_available_to_company_members(self):
         self.client.force_login(self.owner)
