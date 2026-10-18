@@ -169,3 +169,23 @@ class PlatformControl(models.Model):
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class SupportTicket(models.Model):
+    STATUS_CHOICES = [('open', 'Open'), ('in_progress', 'In progress'), ('waiting', 'Waiting for user'), ('resolved', 'Resolved'), ('closed', 'Closed')]
+    PRIORITY_CHOICES = [('low', 'Low'), ('normal', 'Normal'), ('high', 'High'), ('urgent', 'Urgent')]
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.SET_NULL, related_name='support_tickets')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='support_tickets_created')
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='support_tickets_assigned')
+    subject = models.CharField(max_length=180)
+    description = models.TextField(max_length=5000)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='normal')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'#{self.pk} {self.subject}'
