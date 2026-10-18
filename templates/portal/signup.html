@@ -1,1 +1,26 @@
-{% extends 'portal/base.html' %}{% block title %}Create account | Cretan Staffing{% endblock %}{% block content %}<section class="login-shell"><a class="backlink" href="/">← Back to careers</a><div class="panel" style="margin-top:20px;padding:30px"><div class="login-mark">C</div><div class="eyebrow">Join Cretan Staffing</div><h1>Create your account.</h1><p class="muted">Choose the account type that fits how you work with Cretan Staffing.</p>{% if errors %}<div class="error"><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}<form method="post" class="form">{% csrf_token %}<label for="username">Username<input id="username" name="username" autocomplete="username" minlength="3" maxlength="150" required value="{{ values.username|default:'' }}"></label><label for="email">Email address<input id="email" type="email" name="email" autocomplete="email" required value="{{ values.email|default:'' }}"></label><label for="role">I am signing up as<select id="role" name="role" required><option value="candidate" {% if values.role == 'candidate' or not values.role %}selected{% endif %}>Candidate / job seeker</option><option value="client" {% if values.role == 'client' %}selected{% endif %}>Client / employer</option></select></label><label for="password1">Password<input id="password1" type="password" name="password1" autocomplete="new-password" minlength="12" required><span class="muted">Use at least 12 characters.</span></label><label for="password2">Confirm password<input id="password2" type="password" name="password2" autocomplete="new-password" minlength="12" required></label><button class="btn" type="submit" style="width:100%">Create account →</button></form><p class="login-help">Recruiter, manager, and administrator access is invite-only. Client accounts remain pending approval until reviewed by Cretan Staffing.</p><p class="login-help">Already registered? <a href="/login/">Sign in</a>.</p></div></section>{% endblock %}
+{% extends 'portal/base.html' %}{% block title %}Create account | Cretan Staffing{% endblock %}{% block content %}
+<section class="auth-layout">
+  <div class="panel auth-card">
+    <a class="backlink" href="/">← Back to careers</a>
+    <div class="login-mark" style="margin-top:22px">C</div>
+    <div class="eyebrow">Join Cretan Staffing</div>
+    <h1 class="page-title">Create your account.</h1>
+    <p class="muted" style="margin:0 0 22px">Choose the account type that fits how you work with us.</p>
+    {% if errors %}<div class="error"><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+    <form method="post" class="form">{% csrf_token %}
+      <label for="username">Username<input id="username" name="username" autocomplete="username" minlength="3" maxlength="150" required value="{{ values.username|default:'' }}"></label>
+      <label for="email">Email address<input id="email" type="email" name="email" autocomplete="email" required value="{{ values.email|default:'' }}"></label>
+      <label for="role">I am signing up as<select id="role" name="role" required><option value="candidate" {% if values.role == 'candidate' or not values.role %}selected{% endif %}>Candidate / job seeker</option><option value="client" {% if values.role == 'client' %}selected{% endif %}>Client / employer</option></select></label>
+      <label for="password1">Password<input id="password1" type="password" name="password1" autocomplete="new-password" minlength="12" required><span class="muted">Use at least 12 characters.</span></label>
+      <label for="password2">Confirm password<input id="password2" type="password" name="password2" autocomplete="new-password" minlength="12" required></label>
+      <button class="btn" type="submit" style="width:100%;margin-top:5px">Create account <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="login-help">Already registered? <a href="/login/">Sign in</a>.</p>
+  </div>
+  <aside class="auth-side">
+    <div class="eyebrow">Your next chapter</div><h2>Good people. Better opportunities.</h2>
+    <p>Use your Cretan Staffing account to access the workspace built for your role.</p>
+    <ul><li>Candidates can explore job opportunities.</li><li>Client accounts are reviewed before activation.</li><li>Recruiter, manager, and administrator access is granted by Cretan Staffing staff.</li></ul>
+    <div class="side-rule"><strong>Privacy first</strong><p>This is a demo environment. Do not enter real personal or confidential information.</p></div>
+  </aside>
+</section>{% endblock %}
