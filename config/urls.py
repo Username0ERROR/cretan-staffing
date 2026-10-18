@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from portal import views
 from portal import management_views as management
+from portal import profile_views
 
 urlpatterns = [
     path('owner-recovery/', views.owner_recovery, name='owner_recovery'),
@@ -12,6 +13,7 @@ urlpatterns = [
     path('signup/', views.signup, name='signup'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('manage/', management.management_home, name='management_home'),
+    path('profile/', profile_views.my_profile, name='my_profile'),
     path('manage/company/create/', management.create_company, name='create_company'),
     path('manage/company/join/', management.join_company, name='join_company'),
     path('manage/company/switch/', management.switch_company, name='switch_company'),
