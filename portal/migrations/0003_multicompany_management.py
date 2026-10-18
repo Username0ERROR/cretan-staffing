@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
                 ('document_type', models.CharField(choices=[('w4', 'Federal W-4'), ('w9', 'Form W-9'), ('i9', 'Form I-9'), ('1099', 'Form 1099'), ('w2', 'Form W-2'), ('payroll', 'Payroll / tax statement'), ('other', 'Other tax document')], max_length=20)),
                 ('tax_year', models.PositiveSmallIntegerField()),
                 ('status', models.CharField(choices=[('uploaded', 'Uploaded'), ('review', 'Needs review'), ('approved', 'Approved'), ('rejected', 'Rejected')], default='uploaded', max_length=20)),
-                ('file', models.FileField(upload_to=portal.models.private_tax_upload_path)),
+                ('file', models.FileField(upload_to=portal.models.private_tax_upload_path, storage=portal.storage.EncryptedPrivateStorage())),
                 ('uploaded_at', models.DateTimeField(auto_now_add=True)),
                 ('reviewed_at', models.DateTimeField(blank=True, null=True)),
                 ('review_note', models.CharField(blank=True, max_length=500)),
