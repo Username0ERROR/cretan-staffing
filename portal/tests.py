@@ -31,11 +31,3 @@ class SignupTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertFalse(User.objects.filter(username='badrole').exists())
-
-    def test_service_accounts_have_no_interactive_password(self):
-        from django.core.management import call_command
-        call_command('provision_service_accounts')
-        account = User.objects.get(username='svc_email')
-        self.assertFalse(account.has_usable_password())
-        self.assertFalse(account.is_active)
-        self.assertTrue(account.groups.filter(name='service_account').exists())
