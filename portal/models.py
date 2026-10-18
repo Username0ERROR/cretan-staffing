@@ -79,6 +79,7 @@ class AuditEvent(models.Model):
 class IntegrationCredential(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='integrations')
     provider = models.CharField(max_length=120)
+    endpoint_url = models.URLField(max_length=500, blank=True, help_text='HTTPS base URL for the connected system, such as a Horilla instance.')
     account_label = models.CharField(max_length=160)
     external_username = models.CharField(max_length=254, blank=True)
     encrypted_secret = models.TextField(help_text='Fernet-encrypted API token/secret; never store a third-party account password here.')
