@@ -190,3 +190,12 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f'#{self.pk} {self.subject}'
+
+
+class AccountSecurity(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='account_security')
+    force_password_change = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'Security settings for {self.user}'
