@@ -172,6 +172,8 @@ def company_users(request):
             error = 'User not found. Ask them to create an account first.'
         elif role not in valid_roles:
             error = 'That role is not available to your account.'
+        elif target == request.user and membership_for(request.user, company) and membership_for(request.user, company).role == 'company_owner' and role != 'company_owner':
+            error = 'A company owner cannot downgrade their own owner role.'
         elif target.username == os.environ.get('STAFF_LOGIN_USERNAME', '').strip():
             error = 'The protected platform owner role cannot be changed here.'
         else:
@@ -327,7 +329,7 @@ def tax_documents(request):
             year = int(request.POST.get('tax_year', date.today().year))
         except ValueError:
             year = 0
-        if not (is_master_admin(request.user) or (membership and membership.role in COMPANY_ADMIN_ROLES) or not membership):
+        if not (is_master_admin(request.user) or membership is not None):
             error = 'Only a company administrator or an employee uploading their own document can upload documents.'
         elif not uploaded:
             error = 'Choose a document to upload.'
