@@ -16,6 +16,7 @@ urlpatterns = [
     path('manage/support-tickets/', management.support_tickets, name='support_tickets'),
     path('manage/support-tickets/<int:ticket_id>/update/', management.update_support_ticket, name='update_support_ticket'),
     path('profile/', profile_views.my_profile, name='my_profile'),
+    path('account/change-password/', profile_views.change_password, name='change_password'),
     path('manage/company/create/', management.create_company, name='create_company'),
     path('manage/company/join/', management.join_company, name='join_company'),
     path('manage/company/switch/', management.switch_company, name='switch_company'),
