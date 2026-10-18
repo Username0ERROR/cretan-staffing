@@ -157,6 +157,8 @@ def company_users(request):
     if not company:
         return redirect('management_home')
     require_company_access(request.user, company)
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists():
+        raise PermissionDenied('Support accounts cannot change company membership permissions.')
     if not (can_manage_company(request.user, company) or is_master_admin(request.user)):
         raise PermissionDenied('Only company administrators can manage memberships.')
     error = ''
@@ -166,7 +168,7 @@ def company_users(request):
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         role = request.POST.get('role', 'employee')
-        target = User.objects.filter(username=username).first()
+        target = User.objects.filter(username__iexact=username).first()
         valid_roles = {r[0] for r in allowed_roles}
         if not target:
             error = 'User not found. Ask them to create an account first.'
@@ -195,6 +197,8 @@ def company_users(request):
 def toggle_membership(request, membership_id):
     membership = get_object_or_404(CompanyMembership.objects.select_related('company', 'user'), pk=membership_id)
     company = membership.company
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists():
+        raise PermissionDenied('Support accounts cannot change company membership permissions.')
     if not is_master_admin(request.user):
         require_company_admin(request.user, company)
     if membership.user.username == os.environ.get('STAFF_LOGIN_USERNAME', '').strip():
@@ -240,10 +244,12 @@ def support_management(request):
             audit(request.user, 'platform.support_role_assigned', None, 'User', target.pk, {'username': target.username, 'role': role})
             if temporary_password:
                 support_users = User.objects.filter(groups__name__in=SUPPORT_ROLES).distinct().order_by('username')
-                return render(request, 'portal/support_management.html', _management_context(
+                response = render(request, 'portal/support_management.html', _management_context(
                     request, error='', support_users=support_users,
                     temporary_password=temporary_password, created_username=created_username,
                 ))
+                response['Cache-Control'] = 'no-store'
+                return response
             messages.success(request, f'{target.username} was granted {role.replace("_", " ")} access.')
             return redirect('support_management')
     support_users = User.objects.filter(groups__name__in=SUPPORT_ROLES).distinct().order_by('username')
@@ -386,6 +392,8 @@ def download_tax_document(request, document_id):
 @login_required
 @require_http_methods(['POST'])
 def review_tax_document(request, document_id):
+    if request.user.groups.filter(name__in=SUPPORT_ROLES).exists():
+        raise PermissionDenied('Support personnel cannot review tax documents.')
     doc = get_object_or_404(TaxDocument.objects.select_related('company'), pk=document_id)
     if not (is_master_admin(request.user) or can_manage_company(request.user, doc.company) or role_for(request.user, doc.company) == 'manager'):
         raise PermissionDenied('Only company administrators can review tax documents.')
