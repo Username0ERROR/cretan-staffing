@@ -350,6 +350,8 @@ def tax_documents(request):
             error = 'The file exceeds the 10 MB limit.'
         elif year < 2000 or year > date.today().year + 1:
             error = 'Enter a valid tax year.'
+        elif request.POST.get('document_type', 'other') not in dict(TaxDocument.TYPE_CHOICES):
+            error = 'Choose a valid document type.'
         else:
             owner_id = request.POST.get('owner_id') if can_review else request.user.pk
             owner = User.objects.filter(pk=owner_id).first() if owner_id else request.user
@@ -459,6 +461,7 @@ def support_tickets(request):
     return render(request, 'portal/support_tickets.html', _management_context(
         request, tickets=tickets[:200], error=error, support_staff=support_staff,
         ticket_statuses=SupportTicket.STATUS_CHOICES, ticket_priorities=SupportTicket.PRIORITY_CHOICES,
+        support_users=User.objects.filter(groups__name__in=SUPPORT_ROLES, is_active=True).distinct().order_by('username'),
     ))
 
 
@@ -494,6 +497,8 @@ def _validate_public_https_endpoint(url):
         raise ValueError('Use a public HTTPS endpoint without embedded credentials.')
     if parsed.port not in (None, 443):
         raise ValueError('Only the standard HTTPS port is allowed.')
+    if parsed.query or parsed.fragment:
+        raise ValueError('Enter a base URL without query parameters or fragments.')
     hostname = parsed.hostname.rstrip('.').lower()
     if hostname == 'localhost' or hostname.endswith(('.local', '.internal', '.localhost')):
         raise ValueError('Private and local network endpoints are not allowed.')
