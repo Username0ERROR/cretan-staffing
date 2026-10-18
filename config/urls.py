@@ -25,6 +25,7 @@ urlpatterns = [
     path('manage/support/', management.support_management, name='support_management'),
     path('manage/integrations/', management.integration_management, name='integration_management'),
     path('manage/integrations/<int:credential_id>/toggle/', management.toggle_integration, name='toggle_integration'),
+    path('manage/integrations/<int:credential_id>/test/', management.test_integration, name='test_integration'),
     path('manage/tax-documents/', management.tax_documents, name='tax_documents'),
     path('manage/tax-documents/<int:document_id>/download/', management.download_tax_document, name='download_tax_document'),
     path('manage/tax-documents/<int:document_id>/review/', management.review_tax_document, name='review_tax_document'),
