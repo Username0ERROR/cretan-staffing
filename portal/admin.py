@@ -1,20 +1,24 @@
+import os
+
 from django.contrib import admin
-from .models import Job, Application
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+
+from .models import Application, Job, PlatformControl
+
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    list_display = ('title','company','location','is_published','created_at')
-    list_filter = ('is_published','employment_type')
-    search_fields = ('title','company','location')
+    list_display = ('title', 'company', 'location', 'is_published', 'created_at')
+    list_filter = ('is_published', 'employment_type')
+    search_fields = ('title', 'company', 'location')
+
 
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
-    list_display = ('full_name','job','email','created_at')
-    search_fields = ('full_name','email','job__title')
+    list_display = ('full_name', 'job', 'email', 'created_at')
+    search_fields = ('full_name', 'email', 'job__title')
     list_filter = ('created_at',)
-
-
-from .models import PlatformControl
 
 
 @admin.register(PlatformControl)
@@ -28,3 +32,33 @@ class PlatformControlAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+User = get_user_model()
+admin.site.unregister(User)
+
+
+@admin.register(User)
+class ProtectedOwnerUserAdmin(DjangoUserAdmin):
+    # Disabling Django's bulk delete action prevents bypassing the owner guard.
+    actions = [action for action in DjangoUserAdmin.actions if action != 'delete_selected']
+
+    def _is_protected_owner(self, obj):
+        owner_username = os.environ.get('STAFF_LOGIN_USERNAME', '').strip()
+        return bool(owner_username and obj and obj.username == owner_username)
+
+    def has_delete_permission(self, request, obj=None):
+        if self._is_protected_owner(obj):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def delete_model(self, request, obj):
+        if self._is_protected_owner(obj):
+            raise PermissionError('The configured platform owner account cannot be deleted.')
+        return super().delete_model(request, obj)
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if self._is_protected_owner(obj):
+            fields.extend(field for field in ('username', 'is_superuser') if field not in fields)
+        return fields
