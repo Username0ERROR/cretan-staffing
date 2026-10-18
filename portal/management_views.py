@@ -475,11 +475,14 @@ def update_support_ticket(request, ticket_id):
     assigned_username = request.POST.get('assigned_to', '').strip()
     if status not in dict(SupportTicket.STATUS_CHOICES):
         raise PermissionDenied('Invalid ticket status.')
-    ticket.status = status
+    assignee = None
     if assigned_username:
-        ticket.assigned_to = User.objects.filter(username=assigned_username, groups__name__in=SUPPORT_ROLES).first()
-    elif status == 'open':
-        ticket.assigned_to = None
+        assignee = User.objects.filter(username=assigned_username, groups__name__in=SUPPORT_ROLES, is_active=True).first()
+        if assignee is None:
+            messages.error(request, 'Choose an active support user or leave the ticket unassigned.')
+            return redirect('support_tickets')
+    ticket.status = status
+    ticket.assigned_to = assignee
     ticket.save(update_fields=['status', 'assigned_to', 'updated_at'])
     audit(request.user, 'support_ticket.updated', ticket.company, 'SupportTicket', ticket.pk, {'status': status})
     messages.success(request, f'Support request #{ticket.pk} updated.')
