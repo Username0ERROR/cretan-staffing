@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 
-from .models import AuditEvent, Company, CompanyMembership, IntegrationCredential, TaxDocument
+from .models import AuditEvent, Company, CompanyMembership, IntegrationCredential, SupportTicket, TaxDocument
 from .tenancy import (
     COMPANY_ADMIN_ROLES, SUPPORT_ROLES, audit, can_manage_company, decrypt_secret,
     encrypt_secret, is_master_admin, make_company_pin, membership_for, require_company_access,
@@ -392,3 +392,56 @@ def audit_log(request):
             raise PermissionDenied('Audit logs are limited to company managers and administrators.')
         events = AuditEvent.objects.filter(company=company).select_related('actor', 'company')
     return render(request, 'portal/audit_log.html', _management_context(request, events=events[:250]))
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def support_tickets(request):
+    support_staff = request.user.groups.filter(name__in=SUPPORT_ROLES).exists()
+    company = _active_company(request)
+    error = ''
+    if request.method == 'POST':
+        subject = request.POST.get('subject', '').strip()[:180]
+        description = request.POST.get('description', '').strip()[:5000]
+        if not subject or not description:
+            error = 'Enter a subject and a description.'
+        else:
+            ticket = SupportTicket.objects.create(
+                company=company, created_by=request.user, subject=subject,
+                description=description, priority=request.POST.get('priority', 'normal')
+                if request.POST.get('priority', 'normal') in {'low', 'normal', 'high', 'urgent'} else 'normal',
+            )
+            audit(request.user, 'support_ticket.created', company, 'SupportTicket', ticket.pk, {'priority': ticket.priority})
+            messages.success(request, f'Support request #{ticket.pk} was created.')
+            return redirect('support_tickets')
+    if support_staff:
+        tickets = SupportTicket.objects.select_related('company', 'created_by', 'assigned_to')
+    elif company and (is_master_admin(request.user) or role_for(request.user, company) in COMPANY_ADMIN_ROLES | {'manager'}):
+        tickets = SupportTicket.objects.filter(company=company).select_related('company', 'created_by', 'assigned_to')
+    else:
+        tickets = SupportTicket.objects.filter(created_by=request.user).select_related('company', 'created_by', 'assigned_to')
+    return render(request, 'portal/support_tickets.html', _management_context(
+        request, tickets=tickets[:200], error=error, support_staff=support_staff,
+        ticket_statuses=SupportTicket.STATUS_CHOICES, ticket_priorities=SupportTicket.PRIORITY_CHOICES,
+    ))
+
+
+@login_required
+@require_http_methods(['POST'])
+def update_support_ticket(request, ticket_id):
+    if not request.user.groups.filter(name__in=SUPPORT_ROLES).exists() and not is_master_admin(request.user):
+        raise PermissionDenied('Only support staff can update support requests.')
+    ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+    status = request.POST.get('status', '')
+    assigned_username = request.POST.get('assigned_to', '').strip()
+    if status not in dict(SupportTicket.STATUS_CHOICES):
+        raise PermissionDenied('Invalid ticket status.')
+    ticket.status = status
+    if assigned_username:
+        ticket.assigned_to = User.objects.filter(username=assigned_username, groups__name__in=SUPPORT_ROLES).first()
+    elif status == 'open':
+        ticket.assigned_to = None
+    ticket.save(update_fields=['status', 'assigned_to', 'updated_at'])
+    audit(request.user, 'support_ticket.updated', ticket.company, 'SupportTicket', ticket.pk, {'status': status})
+    messages.success(request, f'Support request #{ticket.pk} updated.')
+    return redirect('support_tickets')
