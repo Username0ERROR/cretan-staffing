@@ -247,12 +247,15 @@ def integration_management(request):
     error = ''
     if request.method == 'POST':
         provider = request.POST.get('provider', '').strip()[:120]
+        endpoint_url = request.POST.get('endpoint_url', '').strip()[:500]
         label = request.POST.get('account_label', '').strip()[:160]
         external_username = request.POST.get('external_username', '').strip()[:254]
         secret = request.POST.get('secret', '')
         scopes = request.POST.get('scopes', '').strip()[:500]
         if not provider or not label or not secret:
             error = 'Provider, account label, and API token/secret are required.'
+        elif endpoint_url and not endpoint_url.lower().startswith('https://'):
+            error = 'Integration endpoints must use HTTPS.'
         else:
             try:
                 encrypted = encrypt_secret(secret)
@@ -260,7 +263,7 @@ def integration_management(request):
                 error = str(exc)
             else:
                 credential = IntegrationCredential.objects.create(
-                    company=company, provider=provider, account_label=label,
+                    company=company, provider=provider, endpoint_url=endpoint_url, account_label=label,
                     external_username=external_username, encrypted_secret=encrypted,
                     scopes=scopes, created_by=request.user,
                 )
