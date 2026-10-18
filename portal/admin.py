@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Application, Job, PlatformControl
+from .models import Application, AuditEvent, Company, CompanyMembership, IntegrationCredential, Job, PlatformControl
 
 
 @admin.register(Job)
@@ -62,3 +62,45 @@ class ProtectedOwnerUserAdmin(DjangoUserAdmin):
         if self._is_protected_owner(obj):
             fields.extend(field for field in ('username', 'is_superuser') if field not in fields)
         return fields
+
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'created_by', 'created_at')
+    search_fields = ('name', 'legal_name', 'slug')
+    list_filter = ('is_active',)
+    exclude = ('pin_hash',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(CompanyMembership)
+class CompanyMembershipAdmin(admin.ModelAdmin):
+    list_display = ('user', 'company', 'role', 'is_active', 'updated_at')
+    list_filter = ('role', 'is_active', 'company')
+    search_fields = ('user__username', 'user__email', 'company__name')
+
+
+@admin.register(IntegrationCredential)
+class IntegrationCredentialAdmin(admin.ModelAdmin):
+    list_display = ('company', 'provider', 'account_label', 'external_username', 'is_active', 'updated_at')
+    list_filter = ('provider', 'is_active', 'company')
+    search_fields = ('company__name', 'provider', 'account_label', 'external_username')
+    exclude = ('encrypted_secret',)
+    readonly_fields = ('created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(AuditEvent)
+class AuditEventAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'actor', 'company', 'action', 'target_type', 'target_id')
+    list_filter = ('action', 'company', 'created_at')
+    search_fields = ('actor__username', 'company__name', 'action', 'target_type', 'target_id')
+    readonly_fields = ('actor', 'company', 'action', 'target_type', 'target_id', 'metadata', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
