@@ -174,35 +174,55 @@ def company_users(request):
     if not (can_manage_company(request.user, company) or is_master_admin(request.user)):
         raise PermissionDenied('Only company administrators can manage memberships.')
     error = ''
+    temporary_password = ''
+    created_username = ''
     allowed_roles = [('company_admin', 'Company administrator'), ('manager', 'Manager'), ('employee', 'Employee'), ('viewer', 'Read-only viewer')]
-    if is_master_admin(request.user):
-        allowed_roles += [('support_user', 'Support user'), ('support_admin', 'Support administrator')]
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
         role = request.POST.get('role', 'employee')
         target = User.objects.filter(username__iexact=username).first()
         valid_roles = {r[0] for r in allowed_roles}
-        if not target:
-            error = 'User not found. Ask them to create an account first.'
+        if len(username) < 3:
+            error = 'Username must contain at least 3 characters.'
         elif role not in valid_roles:
             error = 'That role is not available to your account.'
+        elif target is None and not email:
+            error = 'Enter an email address to create a new account.'
+        elif target is None and User.objects.filter(email__iexact=email).exists():
+            error = 'That email address is already in use.'
+        elif target is not None and not target.is_active:
+            error = 'This account is inactive. The main platform administrator must reactivate it first.'
         elif target == request.user and membership_for(request.user, company) and membership_for(request.user, company).role == 'company_owner' and role != 'company_owner':
             error = 'A company owner cannot downgrade their own owner role.'
-        elif target.username == os.environ.get('STAFF_LOGIN_USERNAME', '').strip():
+        elif target and target.username == os.environ.get('STAFF_LOGIN_USERNAME', '').strip():
             error = 'The protected platform owner role cannot be changed here.'
         else:
+            if target is None:
+                temporary_password = secrets.token_urlsafe(18)
+                target = User.objects.create_user(username=username, email=email, password=temporary_password)
+                AccountSecurity.objects.create(user=target, force_password_change=True)
+                created_username = target.username
+                audit(request.user, 'company.user_created', company, 'User', target.pk, {'username': target.username, 'role': role})
             membership, _ = CompanyMembership.objects.update_or_create(
                 user=target, company=company, defaults={'role': role, 'is_active': True},
             )
             audit(request.user, 'membership.role_assigned', company, 'Membership', membership.pk, {'username': target.username, 'role': role})
+            if temporary_password:
+                memberships = CompanyMembership.objects.filter(company=company).select_related('user')
+                response = render(request, 'portal/company_users.html', _management_context(
+                    request, memberships=memberships, allowed_roles=allowed_roles, error='',
+                    can_manage=True, temporary_password=temporary_password, created_username=created_username,
+                ))
+                response['Cache-Control'] = 'no-store'
+                return response
             messages.success(request, f'{target.username} now has the {membership.get_role_display()} role in {company.name}.')
             return redirect('company_users')
     memberships = CompanyMembership.objects.filter(company=company).select_related('user')
     return render(request, 'portal/company_users.html', _management_context(
         request, memberships=memberships, allowed_roles=allowed_roles, error=error,
-        can_manage=True,
+        can_manage=True, temporary_password=temporary_password, created_username=created_username,
     ))
-
 
 @login_required
 @require_http_methods(['POST'])
