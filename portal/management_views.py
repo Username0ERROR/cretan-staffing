@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 
-from .models import AuditEvent, Company, CompanyMembership, IntegrationCredential, SupportTicket, TaxDocument
+from .models import AccountSecurity, AuditEvent, Company, CompanyMembership, IntegrationCredential, SupportTicket, TaxDocument
 from .tenancy import (
     COMPANY_ADMIN_ROLES, SUPPORT_ROLES, audit, can_manage_company, decrypt_secret,
     encrypt_secret, is_master_admin, make_company_pin, membership_for, require_company_access,
@@ -211,25 +211,43 @@ def toggle_membership(request, membership_id):
 def support_management(request):
     require_master_admin(request.user)
     error = ''
+    temporary_password = ''
+    created_username = ''
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
         role = request.POST.get('role', '')
         target = User.objects.filter(username=username).first()
-        if not target:
-            error = 'User not found. They must register first.'
-        elif role not in SUPPORT_ROLES:
+        if role not in SUPPORT_ROLES:
             error = 'Choose support_user or support_admin.'
-        elif target.username == request.user.username:
+        elif target and target.username == request.user.username:
             error = 'The main admin is already the top-level platform role.'
+        elif target is None and (len(username) < 3 or not email):
+            error = 'To create a new support account, provide a username of at least 3 characters and an email address.'
+        elif target is None and User.objects.filter(email__iexact=email).exists():
+            error = 'That email address is already in use.'
         else:
+            if target is None:
+                temporary_password = secrets.token_urlsafe(18)
+                target = User.objects.create_user(username=username, email=email, password=temporary_password)
+                AccountSecurity.objects.create(user=target, force_password_change=True)
+                created_username = target.username
+                audit(request.user, 'platform.support_account_created', None, 'User', target.pk, {'username': target.username, 'role': role})
             group, _ = __import__('django.contrib.auth.models', fromlist=['Group']).Group.objects.get_or_create(name=role)
             target.groups.add(group)
             audit(request.user, 'platform.support_role_assigned', None, 'User', target.pk, {'username': target.username, 'role': role})
+            if temporary_password:
+                support_users = User.objects.filter(groups__name__in=SUPPORT_ROLES).distinct().order_by('username')
+                return render(request, 'portal/support_management.html', _management_context(
+                    request, error='', support_users=support_users,
+                    temporary_password=temporary_password, created_username=created_username,
+                ))
             messages.success(request, f'{target.username} was granted {role.replace("_", " ")} access.')
             return redirect('support_management')
     support_users = User.objects.filter(groups__name__in=SUPPORT_ROLES).distinct().order_by('username')
     return render(request, 'portal/support_management.html', _management_context(
         request, error=error, support_users=support_users,
+        temporary_password=temporary_password, created_username=created_username,
     ))
 
 
