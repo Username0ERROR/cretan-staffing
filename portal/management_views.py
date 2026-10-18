@@ -75,10 +75,17 @@ def management_home(request):
         companies_count = 1
         membership_count = users_count
         events = AuditEvent.objects.filter(company=company).select_related('actor', 'company')[:15]
+    support_flag = request.user.groups.filter(name__in=SUPPORT_ROLES).exists()
+    active_role = role_for(request.user, company) if company else ''
+    can_admin_company = bool(company and can_manage_company(request.user, company) and not support_flag)
+    can_view_audit = bool(is_master_admin(request.user) or (
+        company and active_role in COMPANY_ADMIN_ROLES | {'manager'} and not support_flag
+    ))
     return render(request, 'portal/management.html', _management_context(
         request, users_count=users_count, companies_count=companies_count,
         membership_count=membership_count, recent_events=events,
-        company_admin=bool(company and can_manage_company(request.user, company)),
+        company_admin=can_admin_company, can_admin_company=can_admin_company,
+        can_view_audit=can_view_audit,
     ))
 
 
