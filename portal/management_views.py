@@ -372,6 +372,8 @@ def tax_documents(request):
             year = 0
         if not (is_master_admin(request.user) or membership is not None):
             error = 'Only a company administrator or an employee uploading their own document can upload documents.'
+        elif not os.environ.get('PRIVATE_MEDIA_ROOT', '').strip():
+            error = 'Private document storage is not configured. Set PRIVATE_MEDIA_ROOT to the mounted persistent storage path in Render before uploading tax documents.'
         elif not uploaded:
             error = 'Choose a document to upload.'
         elif os.path.splitext(uploaded.name)[1].lower() not in ALLOWED_DOC_EXTENSIONS:
@@ -402,6 +404,7 @@ def tax_documents(request):
     return render(request, 'portal/tax_documents.html', _management_context(
         request, documents=docs, members=members, can_review=can_review, error=error,
         document_types=TaxDocument.TYPE_CHOICES, current_year=date.today().year,
+        storage_configured=bool(os.environ.get('PRIVATE_MEDIA_ROOT', '').strip()),
     ))
 
 
