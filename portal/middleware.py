@@ -92,3 +92,34 @@ class MaintenanceModeMiddleware:
         if locked:
             return self._maintenance_response(request, message)
         return self.get_response(request)
+
+
+class ForcePasswordChangeMiddleware:
+    """Require newly provisioned support accounts to rotate their temporary password."""
+    EXEMPT_PREFIXES = (
+        '/account/change-password/',
+        '/logout/',
+        '/static/',
+        '/favicon.ico',
+        '/owner-recovery/',
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path.startswith(self.EXEMPT_PREFIXES):
+            return self.get_response(request)
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated:
+            try:
+                from .models import AccountSecurity
+                security = AccountSecurity.objects.filter(user=user, force_password_change=True).first()
+                if security:
+                    from django.shortcuts import redirect
+                    return redirect('change_password')
+            except Exception:
+                # The maintenance middleware handles lock-state failures; do not
+                # prevent account recovery if the security profile table is unavailable.
+                pass
+        return self.get_response(request)
